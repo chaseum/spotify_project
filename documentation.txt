@@ -1,0 +1,43 @@
+
+cumentation used for this project:
+
+Spotify
+- Web API overview: https://developer.spotify.com/documentation/web-api
+- Authorization guide: https://developer.spotify.com/documentation/web-api/concepts/authorization
+- Authorization Code with PKCE tutorial: https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow
+- Scopes: https://developer.spotify.com/documentation/web-api/concepts/scopes
+- Get current user’s playlists: https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
+- Get playlist items: https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks
+- Get user’s saved tracks: https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks
+- Get recently played: https://developer.spotify.com/documentation/web-api/reference/get-recently-played
+- Get user’s top items: https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks
+- Search: https://developer.spotify.com/documentation/web-api/reference/search
+- Create playlist: https://developer.spotify.com/documentation/web-api/reference/create-playlist
+- Web API restrictions announcement (Nov 27, 2024): https://developer.spotify.com/blog/2024-11-27-changes-to-the-web-api
+
+Backend, DB, jobs, infra
+- NestJS docs: https://docs.nestjs.com
+- NestJS Prisma recipe: https://docs.nestjs.com/recipes/prisma
+- NestJS testing: https://docs.nestjs.com/fundamentals/testing
+- NestJS OpenAPI: https://docs.nestjs.com/openapi/introduction
+- Prisma Migrate: https://www.prisma.io/docs/orm/prisma-migrate
+- BullMQ docs: https://docs.bullmq.io
+- Docker Compose file reference: https://docs.docker.com/reference/compose-file/
+- GitHub Actions Node CI: https://docs.github.com/actions/guides/building-and-testing-nodejs
+- OWASP API Security Top 10 (2023): https://owasp.org/API-Security/editions/2023/en/0x11-t10/
+
+Optional enrichment APIs
+- Last.fm API (REST): https://www.last.fm/api/rest
+- Last.fm API methods: https://www.last.fm/api
+- MusicBrainz API: https://musicbrainz.org/doc/MusicBrainz_API
+- MusicBrainz rate limiting: https://musicbrainz.org/doc/MusicBrainz_API/Rate_Limiting
+
+
+scopes:
+- playlist-read-private
+- playlist-modify-private
+- playlist-modify-public
+- user-top-read
+- user-read-recently-played
+- user-library-modify
+- user-library-read
