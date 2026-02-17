@@ -1,0 +1,1 @@
+# fastapi app + static mount + routers
