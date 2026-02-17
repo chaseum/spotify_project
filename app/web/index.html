@@ -3,11 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Spotify Login</title>
+    <title>Spotify Project</title>
+    <link rel="stylesheet" href="/web/styles.css" />
   </head>
   <body>
-    <!-- Manual check: click this button and confirm it redirects to Spotify authorize. -->
-    <button type="button" class="button" onclick="startSpotifyLogin()">Log In with Spotify</button>
-    <script src="./app.js"></script>
+    <main class="page">
+      <h1>Spotify Project</h1>
+      <p id="connection-status" aria-live="polite">Checking Spotify connection...</p>
+      <div>
+        <button id="connect-spotify-button" type="button">Connect Spotify</button>
+        <button id="logout-button" type="button" hidden>Logout</button>
+      </div>
+    </main>
+    <script src="/web/app.js"></script>
   </body>
 </html>
