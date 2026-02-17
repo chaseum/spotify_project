@@ -48,11 +48,20 @@ settings = Settings(
         _read_config_value("SPOTIFY_CLIENT_ID"),
         _read_config_value("CLIENT_ID"),
     ),
-    spotify_redirect_uri="http://127.0.0.1:8000/auth/spotify/callback",
+    spotify_redirect_uri=_first_non_empty(
+        _read_config_value("SPOTIFY_REDIRECT_URI"),
+        "http://127.0.0.1:8000/",
+    ),
     spotify_scopes=_first_non_empty(
         _read_config_value("SPOTIFY_SCOPES"),
         "user-read-private user-read-email",
     ),
-    spotify_authorize_url="https://accounts.spotify.com/authorize",
-    spotify_token_url="https://accounts.spotify.com/api/token",
+    spotify_authorize_url=_first_non_empty(
+        _read_config_value("SPOTIFY_AUTHORIZE_URL"),
+        "https://accounts.spotify.com/authorize",
+    ),
+    spotify_token_url=_first_non_empty(
+        _read_config_value("SPOTIFY_TOKEN_URL"),
+        "https://accounts.spotify.com/api/token",
+    ),
 )

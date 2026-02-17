@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.auth_spotify import router as auth_spotify_router
+from app.api.routes.config import router as config_router
 from app.api.routes.health import router as health_router
 from app.api.routes.me import router as me_router
 
@@ -13,6 +14,7 @@ WEB_DIR = Path(__file__).resolve().parent / "web"
 app = FastAPI(title="Spotify Project API")
 app.include_router(health_router)
 app.include_router(auth_spotify_router)
+app.include_router(config_router)
 app.include_router(me_router)
 
 

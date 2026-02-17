@@ -26,7 +26,7 @@ Before planning or patching:
 
 - Create venv (one-time): `python -m venv .venv`
 - Install deps: `pip install -r requirements.txt`
-- Run API: `uvicorn app.main:app --reload --port 3000`
+- Run API: `uvicorn app.main:app --reload --port 8000`
 - Activate (Windows PowerShell, if needed): `.venv\\Scripts\\Activate.ps1`
 
 ## Test/lint commands

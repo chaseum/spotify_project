@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
+from urllib.parse import urlencode
 
 from app.core.config import settings
 from app.services.spotify_oauth import (
@@ -20,6 +21,24 @@ SESSION_COOKIE_NAME = "spotify_session_id"
 STATE_COOKIE_NAME = "spotify_oauth_state"
 
 router = APIRouter(tags=["auth-spotify"])
+
+
+def _redirect_to_frontend_callback(
+    code: str | None,
+    state: str | None,
+    error: str | None,
+) -> RedirectResponse:
+    query_params: dict[str, str] = {}
+    if code:
+        query_params["code"] = code
+    if state:
+        query_params["state"] = state
+    if error:
+        query_params["error"] = error
+    if not query_params:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+
+    return RedirectResponse(url=f"/?{urlencode(query_params)}", status_code=302)
 
 
 @router.get("/auth/spotify/login")
@@ -61,6 +80,10 @@ async def spotify_callback(
     state: str | None = Query(default=None),
     error: str | None = Query(default=None),
 ) -> RedirectResponse:
+    cookie_state = request.cookies.get(STATE_COOKIE_NAME)
+    if not cookie_state:
+        return _redirect_to_frontend_callback(code=code, state=state, error=error)
+
     if error:
         raise HTTPException(status_code=400, detail=f"Spotify authorization failed: {error}")
     if not code:
@@ -68,13 +91,12 @@ async def spotify_callback(
     if not state:
         raise HTTPException(status_code=400, detail="Missing OAuth state")
 
-    cookie_state = request.cookies.get(STATE_COOKIE_NAME)
-    if not cookie_state or cookie_state != state:
-        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+    if cookie_state != state:
+        return _redirect_to_frontend_callback(code=code, state=state, error=error)
 
     pending_auth = pop_pending_auth(state)
     if not pending_auth:
-        raise HTTPException(status_code=400, detail="OAuth state not found or already used")
+        return _redirect_to_frontend_callback(code=code, state=state, error=error)
     if is_pending_auth_expired(pending_auth):
         raise HTTPException(status_code=400, detail="OAuth state expired")
 
