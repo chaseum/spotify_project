@@ -10,10 +10,38 @@
     <main class="page">
       <h1>Spotify Project</h1>
       <p id="connection-status" aria-live="polite">Checking Spotify connection...</p>
-      <div>
+
+      <section id="disconnected-step">
         <button id="connect-spotify-button" type="button">Connect Spotify</button>
-        <button id="logout-button" type="button" hidden>Logout</button>
-      </div>
+      </section>
+
+      <section id="connected-step" class="hidden" aria-label="Connected account">
+        <button id="disconnect-button" type="button">Disconnect</button>
+        <h2>Create Playlist</h2>
+        <form id="create-playlist-form">
+          <label for="create-playlist-name">Name</label>
+          <input id="create-playlist-name" name="name" type="text" required />
+
+          <label for="create-playlist-description">Description (optional)</label>
+          <input id="create-playlist-description" name="description" type="text" />
+
+          <label for="create-playlist-public">
+            <input id="create-playlist-public" name="public" type="checkbox" />
+            Public playlist
+          </label>
+
+          <button id="create-playlist-submit" type="submit">Create playlist</button>
+          <p id="create-playlist-status" aria-live="polite"></p>
+        </form>
+        <h2>Your Playlists</h2>
+        <p id="playlists-status" aria-live="polite"></p>
+        <ul id="playlists-list" aria-live="polite"></ul>
+        <div>
+          <button id="playlists-prev-button" type="button" disabled>Prev</button>
+          <button id="playlists-next-button" type="button" disabled>Next</button>
+        </div>
+        <p id="playlists-page-summary" aria-live="polite"></p>
+      </section>
     </main>
     <script src="/web/app.js"></script>
   </body>

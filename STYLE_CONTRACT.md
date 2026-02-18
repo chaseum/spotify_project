@@ -1,51 +1,120 @@
-# STYLE_CONTRACT.md
+﻿# STYLE_CONTRACT.md
 
-Scope
+## Scope
 
-- Repo basis: tracked root files only (`README.md`, `app.js`, `index.html`, `styles.css`, `.gitignore`).
-- Excluded as external/local vendor: `NES.css-develop/` (ignored in `.gitignore`).
+This file defines frontend visual and interaction style only.
 
-Scanned config/docs status
+It does **not** define project architecture, backend structure, or required files.
 
-- `AGENTS.md`: not found.
-- `README.md`: found (run/customize guidance).
-- `CONTRIBUTING.md`: not found at root.
-- `pyproject.toml`, `ruff.toml`, `setup.cfg`, `mypy.ini`: not found.
-- `.editorconfig`, `.pre-commit-config.yaml`: not found at root.
-- `Makefile`, `justfile`: not found.
-- `.github/workflows/*`: not found.
+Frontend assets may exist under:
 
-Dominant architecture
+- `app/web/`
+- `app/static/`
+- `app/frontend/`
 
-- Pattern: single-page, DOM-driven state machine controller in one file.
-- Controller/router example: `app.js` (`renderStep`, step render functions, click handlers).
-- Service module example: none found (`uncertain`).
-- DB model module example: none found (`uncertain`).
-- Schema/DTO module example: none found (`uncertain`).
-- Representative `pytest` file: none found (`uncertain`).
+These assets are optional during early backend development.
 
-Conventions
+## Design Philosophy
 
-- JavaScript uses `const` for config/constants and `let` for mutable app state.
-- Constant names are `UPPER_SNAKE_CASE`; functions/vars are `camelCase`.
-- Two-space indentation, semicolons, double quotes, trailing commas in multiline objects/arrays.
-- DOM nodes are queried once near top-level and reused.
-- UI state changes are centralized through small helpers (`setVisible`, `setStepImage`, etc.).
-- Control flow prefers guard clauses and early returns.
-- Event wiring uses inline arrow callbacks with local closure state.
-- CSS uses kebab-case class names, ID hooks for layout anchors, and a `.hidden` utility toggle.
-- Styling favors explicit pixel/hex design tokens and animation keyframes.
-- Accessibility is present via `aria-label`, `aria-live`, and decorative `alt=""`.
+Visual inspiration comes from a retro NES.css aesthetic:
 
-Do rules
+- Pixel-art UI
+- Soft pastel palettes
+- Animated UI micro-interactions
+- Accessibility-first markup
 
-- Keep quiz content/config in top constants (`QUESTIONS`, timing, text, audio volume).
-- Route new behavior through `renderStep()` + dedicated `render*Step()` functions.
-- Reuse helper functions instead of duplicating class toggles and audio guards.
-- Preserve existing DOM IDs/classes used by JS.
+NES.css components (for example `nes-btn`, `nes-container`) may be used but must not be modified internally.
 
-Don’t rules
+## CSS Conventions
 
-- Don’t introduce backend/service/model abstractions without need (`uncertain` for future scale).
-- Don’t edit `NES.css-develop/` for app behavior.
-- Don’t replace `.hidden` toggling with mixed ad-hoc inline visibility logic.
+### Naming
+
+- Classes use kebab-case.
+- IDs are layout anchors only (for example `#app`, `#card`).
+
+Utility classes allowed:
+
+- `.hidden`
+- `.success`
+- `.typewriter`
+
+### Tokens
+
+Prefer explicit pixel values and hex colors.
+
+Examples:
+
+- `#f9d9e2`
+- `#e25572`
+- `#c83f5f`
+
+Avoid CSS frameworks beyond NES.css.
+
+## Animation Patterns
+
+Allowed animation categories:
+
+- subtle float
+- pulse
+- wiggle
+- typewriter caret
+- falling decorative elements
+
+Keyframes should be defined at file bottom.
+
+Animations must:
+
+- not block interaction
+- remain performant
+- avoid layout thrashing
+
+## Layout Rules
+
+- Centered card layout
+- Max width around `420px`
+
+Layering uses z-index in this order:
+
+- background FX
+- app shell
+- UI overlay
+
+Use flexbox, not grid, unless necessary.
+
+## Accessibility Rules
+
+Always preserve:
+
+- `aria-label`
+- `aria-live`
+- `alt=""`
+
+Decorative images must use empty alt text.
+
+## Do Rules
+
+- Keep design tokens consistent with existing palette.
+- Prefer reusable animation classes.
+- Keep DOM IDs stable for JS hooks.
+- Use `.hidden` for visibility toggles.
+
+## Don't Rules
+
+- Do not introduce frontend frameworks (React/Vue/etc.).
+- Do not refactor backend architecture from style updates.
+- Do not embed OAuth or API logic into styling code.
+- Do not edit vendor NES.css files.
+
+## Frontend Role in This Project
+
+Frontend is:
+
+- a thin test shell
+- a visual layer for backend API testing
+
+Backend owns:
+
+- OAuth
+- API wrappers
+- token logic
+- data flow

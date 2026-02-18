@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -51,11 +51,23 @@ def _decode_json(response_body: str) -> Any:
         raise SpotifyClientError(status_code=502, message="Spotify API returned invalid JSON") from exc
 
 
-def _spotify_request_json(path: str, access_token: str) -> Any:
+def _spotify_request_json(
+    path: str,
+    access_token: str,
+    method: str = "GET",
+    json_payload: dict[str, Any] | None = None,
+) -> Any:
+    headers = {"Authorization": f"Bearer {access_token}"}
+    data: bytes | None = None
+    if json_payload is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(json_payload).encode("utf-8")
+
     request = Request(
         f"{SPOTIFY_API_BASE_URL}{path}",
-        headers={"Authorization": f"Bearer {access_token}"},
-        method="GET",
+        headers=headers,
+        data=data,
+        method=method,
     )
 
     try:
@@ -131,7 +143,42 @@ def get_current_user(access_token: str) -> dict[str, Any]:
     return profile
 
 
-def get_current_user_for_session(session_id: str) -> dict[str, Any]:
+def get_my_playlists(access_token: str, limit: int = 10, offset: int = 0) -> dict[str, Any]:
+    safe_limit = max(1, min(10, int(limit)))
+    safe_offset = max(0, int(offset))
+    query = urlencode({"limit": safe_limit, "offset": safe_offset})
+    payload = _spotify_request_json(f"/v1/me/playlists?{query}", access_token)
+    if not isinstance(payload, dict):
+        raise SpotifyClientError(status_code=502, message="Spotify API returned invalid playlists data")
+    return payload
+
+
+def create_my_playlist(
+    access_token: str,
+    name: str,
+    description: str | None = None,
+    public: bool = False,
+) -> dict[str, Any]:
+    safe_name = name.strip()
+    if not safe_name:
+        raise SpotifyClientError(status_code=400, message="Playlist name is required")
+
+    payload: dict[str, Any] = {"name": safe_name, "public": bool(public)}
+    if description is not None:
+        payload["description"] = description
+
+    response_payload = _spotify_request_json(
+        "/v1/me/playlists",
+        access_token,
+        method="POST",
+        json_payload=payload,
+    )
+    if not isinstance(response_payload, dict):
+        raise SpotifyClientError(status_code=502, message="Spotify API returned invalid playlist data")
+    return response_payload
+
+
+def _request_for_session(session_id: str, request_fn: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
     token_data = get_tokens(session_id)
     if not token_data:
         raise SpotifyClientError(status_code=401, message="Not authorized", auth_error=True)
@@ -142,7 +189,7 @@ def get_current_user_for_session(session_id: str) -> dict[str, Any]:
         raise SpotifyClientError(status_code=401, message="Not authorized", auth_error=True)
 
     try:
-        return get_current_user(access_token)
+        return request_fn(access_token)
     except SpotifyClientError as exc:
         if exc.status_code not in (401, 403):
             raise
@@ -164,9 +211,37 @@ def get_current_user_for_session(session_id: str) -> dict[str, Any]:
         raise SpotifyClientError(status_code=401, message="Not authorized", auth_error=True)
 
     try:
-        return get_current_user(refreshed_access_token)
+        return request_fn(refreshed_access_token)
     except SpotifyClientError as exc:
         if exc.status_code in (401, 403):
             clear_tokens(session_id)
             raise SpotifyClientError(status_code=401, message="Not authorized", auth_error=True) from exc
         raise
+
+
+def get_current_user_for_session(session_id: str) -> dict[str, Any]:
+    return _request_for_session(session_id, get_current_user)
+
+
+def get_my_playlists_for_session(session_id: str, limit: int = 10, offset: int = 0) -> dict[str, Any]:
+    return _request_for_session(
+        session_id,
+        lambda access_token: get_my_playlists(access_token=access_token, limit=limit, offset=offset),
+    )
+
+
+def create_my_playlist_for_session(
+    session_id: str,
+    name: str,
+    description: str | None = None,
+    public: bool = False,
+) -> dict[str, Any]:
+    return _request_for_session(
+        session_id,
+        lambda access_token: create_my_playlist(
+            access_token=access_token,
+            name=name,
+            description=description,
+            public=public,
+        ),
+    )

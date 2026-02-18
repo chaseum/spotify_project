@@ -1,18 +1,38 @@
 # STYLE_EXAMPLES.md
 
-Pattern 1: Config-first constants
+## Pattern 1: Retro Card Layout
 
-- Path: `app.js:30`
+```css
+#card {
+  max-width: 420px;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+```
 
-```js
-const FEEDBACK_DELAY_MS = 3000;
-const NO_MOVE_COOLDOWN_MS = 700;
-const TYPEWRITER_CHAR_DELAY_MS = 42;
-const FEEDBACK_TYPEWRITER_CHAR_DELAY_MS = 26;
-const PROMPT_HIGHLIGHTS = ["city", "day", "hackathons", "food"];
-const SOUND_VOLUME = {
-  background: 0.12,
-  select: 0.16,
-  tap: 0.5,
-};
+## Pattern 2: NES Button Overrides
+
+```css
+.nes-btn.is-primary {
+  background-color: #e85b79;
+  border-color: #d94c6a;
+}
+```
+
+## Pattern 3: Pixel Animation
+
+```css
+@keyframes pulse {
+  0% { transform: scale(1.4); }
+  50% { transform: scale(1.8); }
+  100% { transform: scale(1.4); }
+}
+```
+
+## Pattern 4: Utility Visibility Toggle
+
+```css
+.hidden {
+  display: none;
+}
 ```
