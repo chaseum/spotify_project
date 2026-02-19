@@ -10,6 +10,8 @@ const playlistsListElement = document.getElementById("playlists-list");
 const playlistsPrevButton = document.getElementById("playlists-prev-button");
 const playlistsNextButton = document.getElementById("playlists-next-button");
 const playlistsPageSummaryElement = document.getElementById("playlists-page-summary");
+const playlistItemsStatusElement = document.getElementById("playlist-items-status");
+const playlistItemsListElement = document.getElementById("playlist-items-list");
 const createPlaylistFormElement = document.getElementById("create-playlist-form");
 const createPlaylistNameInput = document.getElementById("create-playlist-name");
 const createPlaylistDescriptionInput = document.getElementById("create-playlist-description");
@@ -20,6 +22,9 @@ const createPlaylistStatusElement = document.getElementById("create-playlist-sta
 const STEP_DISCONNECTED = "disconnected";
 const STEP_CONNECTED = "connected";
 const PLAYLISTS_PAGE_LIMIT = 10;
+const PLAYLIST_ITEMS_PAGE_LIMIT = 25;
+const PLAYLIST_ITEMS_NOT_AVAILABLE_MESSAGE =
+  "Items not available unless you own or collaborate on this playlist.";
 const SESSION_STORAGE_PREFIX = "spotify_shell:";
 const SESSION_STORAGE_KEYS = {
   displayName: `${SESSION_STORAGE_PREFIX}display_name`,
@@ -38,6 +43,18 @@ const playlistState = {
   highlightedPlaylistId: "",
 };
 let playlistRequestSequence = 0;
+const playlistItemsState = {
+  selectedPlaylistId: "",
+  selectedPlaylistName: "",
+  items: [],
+  loading: false,
+  error: "",
+  notAvailable: false,
+  offset: 0,
+  limit: PLAYLIST_ITEMS_PAGE_LIMIT,
+  total: 0,
+};
+let playlistItemsRequestSequence = 0;
 
 function toInteger(value, fallback) {
   const parsed = Number.parseInt(String(value), 10);
@@ -99,6 +116,63 @@ function getPlaylistId(playlist) {
   return "";
 }
 
+function getPlaylistItemsTotal(playlist) {
+  const total = toInteger(playlist?.items?.total, -1);
+  return total >= 0 ? total : null;
+}
+
+function getTrackArtistsLabel(track) {
+  const artists = Array.isArray(track?.artists) ? track.artists : [];
+  const names = artists
+    .map((artist) => (typeof artist?.name === "string" ? artist.name.trim() : ""))
+    .filter((name) => Boolean(name));
+  return names.join(", ");
+}
+
+function getPlaylistItemLabel(playlistItem) {
+  const media = playlistItem?.track;
+  const mediaType = typeof media?.type === "string" ? media.type : "";
+  const name = typeof media?.name === "string" ? media.name.trim() : "";
+  const artistLabel = getTrackArtistsLabel(media);
+  const showName = typeof media?.show?.name === "string" ? media.show.name.trim() : "";
+
+  if (mediaType === "track") {
+    if (name && artistLabel) {
+      return `${name} - ${artistLabel}`;
+    }
+    if (name) {
+      return name;
+    }
+    if (artistLabel) {
+      return artistLabel;
+    }
+  }
+
+  if (mediaType === "episode") {
+    if (name && showName) {
+      return `${name} - ${showName}`;
+    }
+    if (name) {
+      return name;
+    }
+    if (showName) {
+      return showName;
+    }
+  }
+
+  if (name && artistLabel) {
+    return `${name} - ${artistLabel}`;
+  }
+  if (name && showName) {
+    return `${name} - ${showName}`;
+  }
+  if (name) {
+    return name;
+  }
+
+  return "Unavailable item metadata";
+}
+
 function setCreatePlaylistStatus(message) {
   if (!createPlaylistStatusElement) {
     return;
@@ -126,6 +200,69 @@ function clearPlaylistHighlight() {
   playlistState.highlightedPlaylistId = "";
 }
 
+function renderPlaylistItems() {
+  const selectedItems = Array.isArray(playlistItemsState.items) ? playlistItemsState.items : [];
+
+  if (playlistItemsListElement) {
+    playlistItemsListElement.textContent = "";
+    for (const playlistItem of selectedItems) {
+      const itemElement = document.createElement("li");
+      itemElement.textContent = getPlaylistItemLabel(playlistItem);
+      playlistItemsListElement.appendChild(itemElement);
+    }
+  }
+
+  if (!playlistItemsStatusElement) {
+    return;
+  }
+
+  if (!playlistItemsState.selectedPlaylistId) {
+    playlistItemsStatusElement.textContent = "Select a playlist to view items.";
+    return;
+  }
+
+  if (playlistItemsState.loading) {
+    const playlistName =
+      typeof playlistItemsState.selectedPlaylistName === "string" &&
+      playlistItemsState.selectedPlaylistName.trim()
+        ? playlistItemsState.selectedPlaylistName.trim()
+        : "selected playlist";
+    playlistItemsStatusElement.textContent = `Loading items for ${playlistName}...`;
+    return;
+  }
+
+  if (playlistItemsState.notAvailable) {
+    playlistItemsStatusElement.textContent = PLAYLIST_ITEMS_NOT_AVAILABLE_MESSAGE;
+    return;
+  }
+
+  if (playlistItemsState.error) {
+    playlistItemsStatusElement.textContent = playlistItemsState.error;
+    return;
+  }
+
+  if (selectedItems.length === 0) {
+    playlistItemsStatusElement.textContent = "No items found in this playlist.";
+    return;
+  }
+
+  playlistItemsStatusElement.textContent = "";
+}
+
+function resetPlaylistItemsState() {
+  playlistItemsState.selectedPlaylistId = "";
+  playlistItemsState.selectedPlaylistName = "";
+  playlistItemsState.items = [];
+  playlistItemsState.loading = false;
+  playlistItemsState.error = "";
+  playlistItemsState.notAvailable = false;
+  playlistItemsState.offset = 0;
+  playlistItemsState.limit = PLAYLIST_ITEMS_PAGE_LIMIT;
+  playlistItemsState.total = 0;
+  playlistItemsRequestSequence += 1;
+  renderPlaylistItems();
+}
+
 function renderPlaylists() {
   const playlistItems = Array.isArray(playlistState.items) ? playlistState.items : [];
 
@@ -133,15 +270,33 @@ function renderPlaylists() {
     playlistsListElement.textContent = "";
     for (const playlist of playlistItems) {
       const itemElement = document.createElement("li");
-      const playlistLabel = `${getPlaylistName(playlist)} - ${getPlaylistOwnerDisplayName(playlist)}`;
+      const playlistId = getPlaylistId(playlist);
+      const itemsTotal = getPlaylistItemsTotal(playlist);
+      const itemCountLabel = itemsTotal === null ? "" : ` (${itemsTotal} items)`;
+      const playlistLabel = `${getPlaylistName(playlist)} - ${getPlaylistOwnerDisplayName(playlist)}${itemCountLabel}`;
       const isHighlightedPlaylist =
         Boolean(playlistState.highlightedPlaylistId) &&
-        getPlaylistId(playlist) === playlistState.highlightedPlaylistId;
-      itemElement.textContent = isHighlightedPlaylist ? `[New] ${playlistLabel}` : playlistLabel;
-      if (isHighlightedPlaylist) {
-        itemElement.style.fontWeight = "700";
-        itemElement.setAttribute("aria-current", "true");
+        playlistId === playlistState.highlightedPlaylistId;
+      const isSelectedPlaylist =
+        Boolean(playlistItemsState.selectedPlaylistId) &&
+        playlistId === playlistItemsState.selectedPlaylistId;
+
+      const selectButton = document.createElement("button");
+      selectButton.type = "button";
+      selectButton.textContent = isHighlightedPlaylist ? `[New] ${playlistLabel}` : playlistLabel;
+      selectButton.disabled = playlistState.loading || !playlistId;
+      if (isHighlightedPlaylist || isSelectedPlaylist) {
+        selectButton.style.fontWeight = "700";
       }
+      if (isSelectedPlaylist) {
+        selectButton.setAttribute("aria-current", "true");
+      }
+      if (playlistId) {
+        selectButton.addEventListener("click", () => {
+          void loadSelectedPlaylistItems(playlist);
+        });
+      }
+      itemElement.appendChild(selectButton);
       playlistsListElement.appendChild(itemElement);
     }
   }
@@ -188,6 +343,7 @@ function resetPlaylistState() {
   playlistState.loading = false;
   playlistState.error = "";
   clearPlaylistHighlight();
+  resetPlaylistItemsState();
   renderPlaylists();
 }
 
@@ -323,6 +479,23 @@ async function apiGetMyPlaylists({ limit = PLAYLISTS_PAGE_LIMIT, offset = 0 } = 
   return apiFetch(`/api/me/playlists?${params.toString()}`, { method: "GET" });
 }
 
+async function apiGetPlaylistItems(playlistId, { limit = PLAYLIST_ITEMS_PAGE_LIMIT, offset = 0 } = {}) {
+  const safePlaylistId = typeof playlistId === "string" ? playlistId.trim() : "";
+  if (!safePlaylistId) {
+    throw { status: 422, message: "Playlist ID is required." };
+  }
+
+  const safeLimit = Math.max(1, toInteger(limit, PLAYLIST_ITEMS_PAGE_LIMIT));
+  const safeOffset = clampPlaylistOffset(offset);
+  const params = new URLSearchParams({
+    limit: String(safeLimit),
+    offset: String(safeOffset),
+  });
+  return apiFetch(`/api/me/playlists/${encodeURIComponent(safePlaylistId)}/items?${params.toString()}`, {
+    method: "GET",
+  });
+}
+
 async function apiCreateMyPlaylist({ name, description = "", public: isPublic = false } = {}) {
   const safeName = typeof name === "string" ? name.trim() : "";
   if (!safeName) {
@@ -345,6 +518,95 @@ async function apiCreateMyPlaylist({ name, description = "", public: isPublic = 
   });
 }
 
+function isPlaylistItemsUnavailableError(error) {
+  const status = toInteger(error?.status, -1);
+  if (status === 403 || status === 404) {
+    return true;
+  }
+
+  const message = typeof error?.message === "string" ? error.message.toLowerCase() : "";
+  return message.includes("not available") || message.includes("collaborat");
+}
+
+async function loadSelectedPlaylistItems(playlist) {
+  const selectedPlaylistId = getPlaylistId(playlist);
+  if (!selectedPlaylistId) {
+    return;
+  }
+
+  const requestSequence = playlistItemsRequestSequence + 1;
+  playlistItemsRequestSequence = requestSequence;
+
+  playlistItemsState.selectedPlaylistId = selectedPlaylistId;
+  playlistItemsState.selectedPlaylistName = getPlaylistName(playlist);
+  playlistItemsState.loading = true;
+  playlistItemsState.error = "";
+  playlistItemsState.notAvailable = false;
+  playlistItemsState.items = [];
+  playlistItemsState.offset = 0;
+  playlistItemsState.total = 0;
+  renderPlaylists();
+  renderPlaylistItems();
+
+  try {
+    const payload = await apiGetPlaylistItems(selectedPlaylistId, {
+      limit: playlistItemsState.limit,
+      offset: 0,
+    });
+    if (
+      requestSequence !== playlistItemsRequestSequence ||
+      playlistItemsState.selectedPlaylistId !== selectedPlaylistId
+    ) {
+      return;
+    }
+
+    const payloadItems = payload?.items;
+    if (!Array.isArray(payloadItems)) {
+      playlistItemsState.loading = false;
+      playlistItemsState.error = "";
+      playlistItemsState.notAvailable = true;
+      playlistItemsState.items = [];
+      playlistItemsState.offset = 0;
+      playlistItemsState.total = 0;
+      renderPlaylistItems();
+      return;
+    }
+
+    playlistItemsState.items = payloadItems;
+    playlistItemsState.limit = Math.max(1, toInteger(payload?.limit, playlistItemsState.limit));
+    playlistItemsState.offset = clampPlaylistOffset(payload?.offset);
+    playlistItemsState.total = Math.max(0, toInteger(payload?.total, payloadItems.length));
+    playlistItemsState.loading = false;
+    playlistItemsState.error = "";
+    playlistItemsState.notAvailable = false;
+    renderPlaylistItems();
+  } catch (error) {
+    if (
+      requestSequence !== playlistItemsRequestSequence ||
+      playlistItemsState.selectedPlaylistId !== selectedPlaylistId
+    ) {
+      return;
+    }
+
+    playlistItemsState.loading = false;
+    playlistItemsState.items = [];
+    playlistItemsState.total = 0;
+
+    if (isPlaylistItemsUnavailableError(error)) {
+      playlistItemsState.error = "";
+      playlistItemsState.notAvailable = true;
+    } else {
+      playlistItemsState.error =
+        error && typeof error.message === "string" && error.message
+          ? error.message
+          : "Failed to load playlist items.";
+      playlistItemsState.notAvailable = false;
+    }
+
+    renderPlaylistItems();
+  }
+}
+
 async function loadMyPlaylists(offset = 0, { clearHighlight = false } = {}) {
   const requestedOffset = clampPlaylistOffset(offset);
   const requestSequence = playlistRequestSequence + 1;
@@ -352,6 +614,7 @@ async function loadMyPlaylists(offset = 0, { clearHighlight = false } = {}) {
   if (clearHighlight) {
     clearPlaylistHighlight();
   }
+  resetPlaylistItemsState();
 
   playlistState.loading = true;
   playlistState.error = "";
@@ -509,6 +772,7 @@ async function initializeApp() {
 
 window.apiMe = apiMe;
 window.apiGetMyPlaylists = apiGetMyPlaylists;
+window.apiGetPlaylistItems = apiGetPlaylistItems;
 window.apiCreateMyPlaylist = apiCreateMyPlaylist;
 
 void initializeApp();

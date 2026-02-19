@@ -153,6 +153,25 @@ def get_my_playlists(access_token: str, limit: int = 10, offset: int = 0) -> dic
     return payload
 
 
+def get_playlist_items(
+    access_token: str,
+    playlist_id: str,
+    limit: int = 25,
+    offset: int = 0,
+) -> dict[str, Any]:
+    safe_playlist_id = playlist_id.strip()
+    if not safe_playlist_id:
+        raise SpotifyClientError(status_code=400, message="Playlist ID is required")
+
+    safe_limit = max(1, min(50, int(limit)))
+    safe_offset = max(0, int(offset))
+    query = urlencode({"limit": safe_limit, "offset": safe_offset})
+    payload = _spotify_request_json(f"/v1/playlists/{safe_playlist_id}/items?{query}", access_token)
+    if not isinstance(payload, dict):
+        raise SpotifyClientError(status_code=502, message="Spotify API returned invalid playlist items data")
+    return payload
+
+
 def create_my_playlist(
     access_token: str,
     name: str,
@@ -227,6 +246,23 @@ def get_my_playlists_for_session(session_id: str, limit: int = 10, offset: int =
     return _request_for_session(
         session_id,
         lambda access_token: get_my_playlists(access_token=access_token, limit=limit, offset=offset),
+    )
+
+
+def get_playlist_items_for_session(
+    session_id: str,
+    playlist_id: str,
+    limit: int = 25,
+    offset: int = 0,
+) -> dict[str, Any]:
+    return _request_for_session(
+        session_id,
+        lambda access_token: get_playlist_items(
+            access_token=access_token,
+            playlist_id=playlist_id,
+            limit=limit,
+            offset=offset,
+        ),
     )
 
 

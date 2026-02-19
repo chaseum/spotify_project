@@ -5,6 +5,7 @@ from app.services.spotify_client import (
     SpotifyClientError,
     create_my_playlist_for_session,
     get_current_user_for_session,
+    get_playlist_items_for_session,
     get_my_playlists_for_session,
 )
 
@@ -71,6 +72,29 @@ async def create_my_playlist(request: Request, payload: CreatePlaylistRequest) -
             name=name,
             description=description,
             public=payload.public,
+        )
+    except SpotifyClientError as exc:
+        status_code = 401 if exc.auth_error else exc.status_code
+        raise HTTPException(status_code=status_code, detail=exc.message) from exc
+
+
+@router.get("/api/me/playlists/{playlist_id}/items")
+async def get_playlist_items(
+    playlist_id: str,
+    request: Request,
+    limit: int = Query(default=25, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+) -> dict:
+    session_id = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Not authorized")
+
+    try:
+        return get_playlist_items_for_session(
+            session_id=session_id,
+            playlist_id=playlist_id,
+            limit=limit,
+            offset=offset,
         )
     except SpotifyClientError as exc:
         status_code = 401 if exc.auth_error else exc.status_code

@@ -56,6 +56,53 @@ def test_api_me_playlists_rejects_limit_above_10() -> None:
     assert response.status_code == 422
 
 
+def test_api_me_playlist_items_returns_payload(monkeypatch) -> None:
+    monkeypatch.setattr(
+        me_route,
+        "get_playlist_items_for_session",
+        lambda session_id, playlist_id, limit, offset: {
+            "items": [{"track": {"name": "Song A", "type": "track"}}],
+            "limit": limit,
+            "offset": offset,
+            "total": 1,
+            "href": f"/v1/playlists/{playlist_id}/items",
+        },
+    )
+
+    response = client.get(
+        "/api/me/playlists/playlist-123/items?limit=25&offset=0",
+        cookies={me_route.SESSION_COOKIE_NAME: "session-123"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [{"track": {"name": "Song A", "type": "track"}}],
+        "limit": 25,
+        "offset": 0,
+        "total": 1,
+        "href": "/v1/playlists/playlist-123/items",
+    }
+
+
+def test_api_me_playlist_items_maps_non_auth_error_status(monkeypatch) -> None:
+    def raise_request_error(*args, **kwargs):
+        raise spotify_client.SpotifyClientError(
+            status_code=403,
+            message="Forbidden",
+            auth_error=False,
+        )
+
+    monkeypatch.setattr(me_route, "get_playlist_items_for_session", raise_request_error)
+
+    response = client.get(
+        "/api/me/playlists/playlist-123/items?limit=25&offset=0",
+        cookies={me_route.SESSION_COOKIE_NAME: "session-123"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "Forbidden"}
+
+
 def test_get_current_user_for_session_refreshes_and_retries(monkeypatch) -> None:
     session_id = "session-123"
     initial_tokens = {"access_token": "expired-access", "refresh_token": "refresh-123"}
@@ -138,6 +185,39 @@ def test_get_my_playlists_for_session_refreshes_and_retries(monkeypatch) -> None
         session_id,
         {"access_token": "new-access", "refresh_token": "refresh-123", "expires_in": 3600},
     )
+
+
+def test_get_playlist_items_uses_items_endpoint(monkeypatch) -> None:
+    state: dict[str, object] = {}
+
+    def fake_spotify_request_json(
+        path: str,
+        access_token: str,
+        method: str = "GET",
+        json_payload: dict | None = None,
+    ) -> dict:
+        state["path"] = path
+        state["access_token"] = access_token
+        state["method"] = method
+        state["json_payload"] = json_payload
+        return {"items": [], "limit": 25, "offset": 0, "total": 0}
+
+    monkeypatch.setattr(spotify_client, "_spotify_request_json", fake_spotify_request_json)
+
+    payload = spotify_client.get_playlist_items(
+        access_token="access-123",
+        playlist_id="playlist-123",
+        limit=25,
+        offset=0,
+    )
+
+    assert payload == {"items": [], "limit": 25, "offset": 0, "total": 0}
+    assert state == {
+        "path": "/v1/playlists/playlist-123/items?limit=25&offset=0",
+        "access_token": "access-123",
+        "method": "GET",
+        "json_payload": None,
+    }
 
 
 def test_get_current_user_for_session_fails_when_refresh_token_missing(monkeypatch) -> None:
